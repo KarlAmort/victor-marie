@@ -956,18 +956,18 @@ func (c *hugoBuilder) handleEvents(watcher *watcher.Batcher,
 
 				if p != nil && p.RelPermalink() != "" {
 					link, port := p.RelPermalink(), p.Site().ServerPort()
-					lrl.Logf("navigating to %q using port %d", link, port)
-					livereload.NavigateToPathForPort(link, port)
+					lrl.Logf("selective refresh to %q using port %d", link, port)
+					livereload.SelectiveRefreshPathForPort(link, port)
 				} else {
 					lrl.Logf("no page to navigate to, force refresh")
 					livereload.ForceRefresh()
 				}
 			} else if len(otherChanges) > 0 || len(cssChanges) > 0 {
 				if len(otherChanges) == 1 {
-					// Allow single changes to be refreshed without a full page reload.
+					// Allow single changes to be refreshed using selective reload.
 					pathToRefresh := h.PathSpec.RelURL(paths.ToSlashTrimLeading(otherChanges[0]), false)
-					lrl.Logf("refreshing %q", pathToRefresh)
-					livereload.RefreshPath(pathToRefresh)
+					lrl.Logf("selective refreshing %q", pathToRefresh)
+					livereload.SelectiveRefreshPath(pathToRefresh)
 				} else if len(cssChanges) == 0 || len(otherChanges) > 1 {
 					lrl.Logf("force refresh")
 					livereload.ForceRefresh()

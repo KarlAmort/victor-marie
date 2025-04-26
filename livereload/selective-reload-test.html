@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hugo Selective Reload Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; }
+        .highlight { background-color: yellow; transition: background-color 0.3s ease-in-out; }
+        #test-content { min-height: 200px; background: #f5f5f5; padding: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Hugo Selective Reload Test Page</h1>
+
+    <div class="test-section">
+        <h2>Test Instructions</h2>
+        <p>This page demonstrates the Hugo selective reload functionality:</p>
+        <ol>
+            <li>Start Hugo server with livereload enabled</li>
+            <li>Make changes to content files</li>
+            <li>Observe selective DOM updates with yellow highlighting</li>
+            <li>Verify scroll position is preserved during updates</li>
+        </ol>
+    </div>
+
+    <div class="test-section" id="test-content">
+        <h3>Dynamic Content Area</h3>
+        <p>This area will be updated when content changes are detected.</p>
+        <p>Current time: <span id="timestamp">[TIMESTAMP]</span></p>
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+    </div>
+
+    <div class="test-section">
+        <h3>Console Output</h3>
+        <p>Check the browser console for Hugo Selective Reload plugin messages.</p>
+        <div id="console-output" style="background: #000; color: #0f0; padding: 10px; font-family: monospace; min-height: 100px;">
+            Plugin loading...
+        </div>
+    </div>
+
+    <script>
+        // Test utility functions
+        function updateTimestamp() {
+            const now = new Date().toISOString();
+            const timestampEl = document.getElementById('timestamp');
+            if (timestampEl) {
+                timestampEl.textContent = now;
+            }
+        }
+
+        function logToConsole(message) {
+            const consoleEl = document.getElementById('console-output');
+            if (consoleEl) {
+                consoleEl.innerHTML += '<br>' + new Date().toLocaleTimeString() + ': ' + message;
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+            }
+        }
+
+        // Monitor for plugin initialization
+        function checkPluginStatus() {
+            if (window.HugoSelectiveReload) {
+                logToConsole('✓ Hugo Selective Reload plugin detected');
+            } else {
+                logToConsole('× Hugo Selective Reload plugin not found');
+                setTimeout(checkPluginStatus, 1000);
+            }
+        }
+
+        // Monitor LiveReload status
+        function checkLiveReloadStatus() {
+            if (window.LiveReload) {
+                logToConsole('✓ LiveReload detected');
+                checkPluginStatus();
+            } else {
+                logToConsole('× LiveReload not found, retrying...');
+                setTimeout(checkLiveReloadStatus, 1000);
+            }
+        }
+
+        // Initialize test
+        document.addEventListener('DOMContentLoaded', function() {
+            updateTimestamp();
+            setInterval(updateTimestamp, 5000);
+            logToConsole('Test page loaded');
+            checkLiveReloadStatus();
+        });
+
+        // Monitor for selective reload events
+        window.addEventListener('beforeunload', function() {
+            logToConsole('Page unloading (this should not happen during selective reload)');
+        });
+    </script>
+
+    <!-- LiveReload script will be injected here by Hugo -->
+</body>
+</html>

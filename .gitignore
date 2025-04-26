@@ -1,4 +1,4 @@
-
+/hugo
 *.test
 imports.*
 dist/

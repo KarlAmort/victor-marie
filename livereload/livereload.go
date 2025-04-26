@@ -127,6 +127,18 @@ func RefreshPath(s string) {
 	refreshPathForPort(s, -1)
 }
 
+// SelectiveRefreshPath tells livereload to perform a selective refresh for the given path.
+// This will attempt to update only the changed portions of the page instead of a full reload.
+func SelectiveRefreshPath(s string) {
+	selectiveRefreshPathForPort(s, -1)
+}
+
+// SelectiveRefreshPathForPort is similar to SelectiveRefreshPath but will also
+// set window.location.port to the given port value.
+func SelectiveRefreshPathForPort(s string, port int) {
+	selectiveRefreshPathForPort(s, port)
+}
+
 func refreshPathForPort(s string, port int) {
 	// Tell livereload a file has changed - will force a hard refresh if not CSS or an image
 	urlPath := filepath.ToSlash(s)
@@ -138,6 +150,17 @@ func refreshPathForPort(s string, port int) {
 	wsHub.broadcast <- []byte(msg)
 }
 
+func selectiveRefreshPathForPort(s string, port int) {
+	// Tell livereload to perform selective refresh for Hugo plugin
+	urlPath := filepath.ToSlash(s)
+	portStr := ""
+	if port > 0 {
+		portStr = fmt.Sprintf(`, "overrideURL": %d`, port)
+	}
+	msg := fmt.Sprintf(`{"command":"hugo_selective_reload","path":%q,"originalPath":"","liveCSS":true,"liveImg":true%s}`, urlPath, portStr)
+	wsHub.broadcast <- []byte(msg)
+}
+
 // ServeJS serves the livereload.js who's reference is injected into the page.
 func ServeJS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", media.Builtin.JavascriptType.Type)
@@ -145,8 +168,13 @@ func ServeJS(w http.ResponseWriter, r *http.Request) {
 }
 
 func liveReloadJS() []byte {
-	return []byte(livereloadJS)
+	// Combine the original livereload.js with our selective reload plugin
+	combined := livereloadJS + "\n\n" + hugoSelectiveReloadJS
+	return []byte(combined)
 }
 
 //go:embed livereload.min.js
 var livereloadJS string
+
+//go:embed hugo-selective-reload.js
+var hugoSelectiveReloadJS string
