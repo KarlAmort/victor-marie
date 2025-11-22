@@ -535,3 +535,87 @@ disableKinds = ['page','rss','section','sitemap','taxonomy','term']
 	b, err = hugolib.TestE(t, f)
 	b.Assert(err.Error(), qt.Contains, "invalid strict mode")
 }
+
+func TestHTMLToMarkdown(t *testing.T) {
+	t.Parallel()
+
+	markdown := `
+# Heading
+
+Some **bold** text.
+
+A [link](https://example.com).
+
+An image:
+
+![alt text](https://example.com/image.jpg "Image Title")
+
+A list:
+
+- Item 1
+- Item 2
+  - Item 2a
+  - Item 2b
+
+A table:
+
+| Header 1 | Header 2 |
+|----------|----------|
+| Cell 1   | Cell 2   |
+| Cell 3   | Cell 4   |
+
+A blockquote:
+
+> This is a quote.
+	`
+	files := `
+-- hugo.toml --
+disableKinds = ['rss','section','sitemap','taxonomy','term']
+-- layouts/all.html --
+All html.
+-- layouts/all.markdown --
+{{ .Content | transform.HTMLToMarkdown | safeHTML }}
+-- content/p1.md --
+---
+title: p1
+outputs: ["html", "markdown"]
+---
+`
+
+	files += markdown
+
+	b := hugolib.Test(t, files)
+
+	b.AssertFileContent("public/p1/index.html", `All html.`)
+
+	// There are some white space differences, so we cannot do an exact match.
+	b.AssertFileContent("public/p1/index.md", markdown)
+}
+
+// See https://github.com/goccy/go-yaml/issues/461
+func TestUnmarshalExcessiveYAMLStructureShouldFail(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['page','rss','section','sitemap','taxonomy','term']
+-- assets/ddos.yaml --
+a: &a [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _]
+b: &b [*a, *a, *a, *a, *a, *a, *a, *a, *a, *a]
+c: &c [*b, *b, *b, *b, *b, *b, *b, *b, *b, *b]
+d: &d [*c, *c, *c, *c, *c, *c, *c, *c, *c, *c]
+e: &e [*d, *d, *d, *d, *d, *d, *d, *d, *d, *d]
+f: &f [*e, *e, *e, *e, *e, *e, *e, *e, *e, *e]
+g: &g [*f, *f, *f, *f, *f, *f, *f, *f, *f, *f]
+h: &h [*g, *g, *g, *g, *g, *g, *g, *g, *g, *g]
+i: &i [*h, *h, *h, *h, *h, *h, *h, *h, *h, *h]
+-- layouts/home.html --
+{{ $m := resources.Get "ddos.yaml" | transform.Unmarshal }}
+{{ printf "Length: %d" (len $m) }}
+`
+
+	b, err := hugolib.TestE(t, files)
+
+	b.Assert(err, qt.IsNotNil)
+	b.Assert(err.Error(), qt.Contains, "too many YAML aliases for non-scalar nodes")
+}

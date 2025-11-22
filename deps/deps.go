@@ -217,14 +217,14 @@ func (d *Deps) Init() error {
 			[]byte(tpl.HugoDeferredTemplatePrefix),
 			[]byte(postpub.PostProcessPrefix))
 
-		pathSpec, err := helpers.NewPathSpec(d.Fs, d.Conf, d.Log)
+		pathSpec, err := helpers.NewPathSpec(d.Fs, d.Conf, d.Log, nil)
 		if err != nil {
 			return err
 		}
 		d.PathSpec = pathSpec
 	} else {
 		var err error
-		d.PathSpec, err = helpers.NewPathSpecWithBaseBaseFsProvided(d.Fs, d.Conf, d.Log, d.PathSpec.BaseFs)
+		d.PathSpec, err = helpers.NewPathSpec(d.Fs, d.Conf, d.Log, d.PathSpec.BaseFs)
 		if err != nil {
 			return err
 		}
@@ -416,6 +416,9 @@ type DepsCfg struct {
 
 	// i18n handling.
 	TranslationProvider ResourceProvider
+
+	// Build triggered by the IntegrationTest framework.
+	IsIntegrationTest bool
 
 	// ChangesFromBuild for changes passed back to the server/watch process.
 	ChangesFromBuild chan []identity.Identity

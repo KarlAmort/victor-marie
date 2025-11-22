@@ -22,7 +22,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/gohugoio/hugo/common/hugo"
+	"github.com/gohugoio/hugo/common/version"
 	"github.com/gohugoio/hugo/htesting/hqt"
 	"github.com/spf13/cast"
 )
@@ -207,6 +207,11 @@ func doTestCompare(t *testing.T, tp tstCompareType, funcUnderTest func(a, b any)
 		{uint32(4), uint16(3), 1},
 		{uint64(4), 4, 0},
 		{4, uint64(4), 0},
+		{uint64(4), 5, -1},
+		{5, uint64(4), 1},
+		{uint64(5), uint64(4), 1},
+		{uint64(4), uint64(5), -1},
+		{uint64(5), uint64(5), 0},
 		{uint64(math.MaxUint32), uint32(math.MaxUint32), 0},
 		{uint64(math.MaxUint16), int(math.MaxUint16), 0},
 		{int16(4), int(5), -1},
@@ -233,17 +238,17 @@ func doTestCompare(t *testing.T, tp tstCompareType, funcUnderTest func(a, b any)
 		{tstEqerType1("a"), tstEqerType2("a"), 0},
 		{tstEqerType2("a"), tstEqerType1("a"), 0},
 		{tstEqerType2("a"), tstEqerType1("b"), -1},
-		{hugo.MustParseVersion("0.32.1").Version(), hugo.MustParseVersion("0.32").Version(), 1},
-		{hugo.MustParseVersion("0.35").Version(), hugo.MustParseVersion("0.32").Version(), 1},
-		{hugo.MustParseVersion("0.36").Version(), hugo.MustParseVersion("0.36").Version(), 0},
-		{hugo.MustParseVersion("0.32").Version(), hugo.MustParseVersion("0.36").Version(), -1},
-		{hugo.MustParseVersion("0.32").Version(), "0.36", -1},
-		{"0.36", hugo.MustParseVersion("0.32").Version(), 1},
-		{"0.36", hugo.MustParseVersion("0.36").Version(), 0},
-		{"0.37", hugo.MustParseVersion("0.37-DEV").Version(), 1},
-		{"0.37-DEV", hugo.MustParseVersion("0.37").Version(), -1},
-		{"0.36", hugo.MustParseVersion("0.37-DEV").Version(), -1},
-		{"0.37-DEV", hugo.MustParseVersion("0.37-DEV").Version(), 0},
+		{version.MustParseVersion("0.32.1").Version(), version.MustParseVersion("0.32").Version(), 1},
+		{version.MustParseVersion("0.35").Version(), version.MustParseVersion("0.32").Version(), 1},
+		{version.MustParseVersion("0.36").Version(), version.MustParseVersion("0.36").Version(), 0},
+		{version.MustParseVersion("0.32").Version(), version.MustParseVersion("0.36").Version(), -1},
+		{version.MustParseVersion("0.32").Version(), "0.36", -1},
+		{"0.36", version.MustParseVersion("0.32").Version(), 1},
+		{"0.36", version.MustParseVersion("0.36").Version(), 0},
+		{"0.37", version.MustParseVersion("0.37-DEV").Version(), 1},
+		{"0.37-DEV", version.MustParseVersion("0.37").Version(), -1},
+		{"0.36", version.MustParseVersion("0.37-DEV").Version(), -1},
+		{"0.37-DEV", version.MustParseVersion("0.37-DEV").Version(), 0},
 		// https://github.com/gohugoio/hugo/issues/5905
 		{nil, nil, 0},
 		{testT.NonEmptyInterfaceNil, nil, 0},

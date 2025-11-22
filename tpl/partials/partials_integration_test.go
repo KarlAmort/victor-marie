@@ -237,16 +237,12 @@ ABCDE
 		T:           b,
 		TxtarString: files,
 	}
-	builders := make([]*hugolib.IntegrationTestBuilder, b.N)
 
-	for i := range builders {
-		builders[i] = hugolib.NewIntegrationTestBuilder(cfg)
-	}
-
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		builders[i].Build()
+	for b.Loop() {
+		b.StopTimer()
+		bb := hugolib.NewIntegrationTestBuilder(cfg)
+		b.StartTimer()
+		bb.Build()
 	}
 }
 

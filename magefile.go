@@ -61,6 +61,11 @@ func Uninstall() error {
 	return sh.Run(goexe, "clean", "-i", packageName)
 }
 
+// Uninstall all installed binaries (including test binaries)
+func UninstallAll() error {
+	return sh.Run(goexe, "clean", "-i", "./...")
+}
+
 func flagEnv() map[string]string {
 	hash, _ := sh.Output("git", "rev-parse", "--short", "HEAD")
 	return map[string]string{
@@ -68,6 +73,10 @@ func flagEnv() map[string]string {
 		"COMMIT_HASH": hash,
 		"BUILD_DATE":  time.Now().Format("2006-01-02T15:04:05Z0700"),
 	}
+}
+
+func emptyEnv() map[string]string {
+	return map[string]string{}
 }
 
 // Generate autogen packages
@@ -136,12 +145,6 @@ func Docker() error {
 
 // Run tests and linters
 func Check() {
-	if runtime.GOARCH == "amd64" && runtime.GOOS != "darwin" {
-		mg.Deps(Test386)
-	} else {
-		fmt.Printf("Skip Test386 on %s and/or %s\n", runtime.GOARCH, runtime.GOOS)
-	}
-
 	if isCI() && isDarwin() {
 		// Skip on macOS in CI (disk space issues)
 	} else {
@@ -151,6 +154,9 @@ func Check() {
 	// don't run two tests in parallel, they saturate the CPUs anyway, and running two
 	// causes memory issues in CI.
 	mg.Deps(TestRace)
+	if isCI() {
+		mg.Deps(CleanTest, UninstallAll)
+	}
 }
 
 func testGoFlags() string {
@@ -159,6 +165,11 @@ func testGoFlags() string {
 	}
 
 	return "-timeout=1m"
+}
+
+// Clean Go's test cache.
+func CleanTest() error {
+	return runCmd(emptyEnv(), goexe, "clean", "-testcache")
 }
 
 // Run tests in 32-bit mode

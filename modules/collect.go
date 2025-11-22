@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,13 +30,13 @@ import (
 	"github.com/gohugoio/hugo/common/herrors"
 	"github.com/gohugoio/hugo/common/loggers"
 	"github.com/gohugoio/hugo/common/paths"
+	"github.com/gohugoio/hugo/common/version"
 	"golang.org/x/mod/module"
 
 	"github.com/spf13/cast"
 
 	"github.com/gohugoio/hugo/common/maps"
 
-	"github.com/gohugoio/hugo/common/hugo"
 	"github.com/gohugoio/hugo/parser/metadecoders"
 
 	"github.com/gohugoio/hugo/hugofs/files"
@@ -64,7 +65,7 @@ func (h *Client) Collect() (ModulesConfig, error) {
 		}
 	}
 
-	if err := (&mc).finalize(h.logger); err != nil {
+	if err := (&mc).finalize(); err != nil {
 		return mc, err
 	}
 
@@ -134,25 +135,28 @@ func (m *ModulesConfig) setActiveMods(logger loggers.Logger) error {
 	return nil
 }
 
-func (m *ModulesConfig) finalize(logger loggers.Logger) error {
+func (m *ModulesConfig) finalize() error {
 	for _, mod := range m.AllModules {
 		m := mod.(*moduleAdapter)
-		m.mounts = filterUnwantedMounts(m.mounts)
+		m.mounts = filterDuplicateMounts(m.mounts)
 	}
 	return nil
 }
 
-func filterUnwantedMounts(mounts []Mount) []Mount {
-	// Remove duplicates
-	seen := make(map[string]bool)
-	tmp := mounts[:0]
-	for _, m := range mounts {
-		if !seen[m.key()] {
-			tmp = append(tmp, m)
+// filterDuplicateMounts removes duplicate mounts while preserving order.
+// The input slice will not be modified.
+func filterDuplicateMounts(mounts []Mount) []Mount {
+	var x []Mount
+	for _, m1 := range mounts {
+		var found bool
+		if slices.ContainsFunc(x, m1.Equal) {
+			found = true
 		}
-		seen[m.key()] = true
+		if !found {
+			x = append(x, m1)
+		}
 	}
-	return tmp
+	return x
 }
 
 type pathVersionKey struct {
@@ -525,7 +529,7 @@ LOOP:
 		}
 	}
 
-	config, err := decodeConfig(tc.cfg, c.moduleConfig.replacementsMap)
+	config, err := decodeConfig(c.logger.Logger(), tc.cfg, c.moduleConfig.replacementsMap)
 	if err != nil {
 		return err
 	}
@@ -537,7 +541,7 @@ LOOP:
 		// Merge old with new
 		if minVersion, found := themeCfg[oldVersionKey]; found {
 			if config.HugoVersion.Min == "" {
-				config.HugoVersion.Min = hugo.VersionString(cast.ToString(minVersion))
+				config.HugoVersion.Min = version.VersionString(cast.ToString(minVersion))
 			}
 		}
 
@@ -695,6 +699,19 @@ func (c *collector) mountCommonJSConfig(owner *moduleAdapter, mounts []Mount) ([
 	return mounts, nil
 }
 
+func (c *collector) nodeModulesRoot(s string) string {
+	s = filepath.ToSlash(s)
+	if strings.HasPrefix(s, "node_modules/") {
+		return s
+	}
+	if strings.HasPrefix(s, "../../node_modules/") {
+		// See #14083. This was a common construct to mount node_modules from the project root.
+		// This started failing in v0.152.0 when we tightened the validation.
+		return strings.TrimPrefix(s, "../../")
+	}
+	return ""
+}
+
 func (c *collector) normalizeMounts(owner *moduleAdapter, mounts []Mount) ([]Mount, error) {
 	var out []Mount
 	dir := owner.Dir()
@@ -706,11 +723,25 @@ func (c *collector) normalizeMounts(owner *moduleAdapter, mounts []Mount) ([]Mou
 			return nil, errors.New(errMsg + ": both source and target must be set")
 		}
 
+		// Special case for node_modules imports in themes/modules.
+		// See #14089.
+		var isModuleNodeModulesImport bool
+		if !owner.projectMod {
+			nodeModulesImportSource := c.nodeModulesRoot(mnt.Source)
+			if nodeModulesImportSource != "" {
+				isModuleNodeModulesImport = true
+				mnt.Source = nodeModulesImportSource
+			}
+		}
+
 		mnt.Source = filepath.Clean(mnt.Source)
 		mnt.Target = filepath.Clean(mnt.Target)
 		var sourceDir string
 
-		if owner.projectMod && filepath.IsAbs(mnt.Source) {
+		if !owner.projectMod && !filepath.IsLocal(mnt.Source) {
+			return nil, fmt.Errorf("%s: %q: mount source must be a local path for modules/themes", errMsg, mnt.Source)
+		}
+		if filepath.IsAbs(mnt.Source) {
 			// Abs paths in the main project is allowed.
 			sourceDir = mnt.Source
 		} else {
@@ -738,9 +769,18 @@ func (c *collector) normalizeMounts(owner *moduleAdapter, mounts []Mount) ([]Mou
 				}
 				f.Close()
 			} else {
-				// TODO(bep) commenting out for now, as this will create to much noise.
-				// c.logger.Warnf("module %q: mount source %q does not exist", owner.Path(), sourceDir)
-				continue
+				if isModuleNodeModulesImport {
+					// A module imported a path inside node_modules, but it didn't exist.
+					// Make this a special case and also try relative to the project root.
+					sourceDir = filepath.Join(c.ccfg.WorkingDir, mnt.Source)
+					_, err := c.fs.Stat(sourceDir)
+					if err != nil {
+						continue
+					}
+					mnt.Source = sourceDir
+				} else {
+					continue
+				}
 			}
 		}
 
@@ -752,6 +792,10 @@ func (c *collector) normalizeMounts(owner *moduleAdapter, mounts []Mount) ([]Mou
 		}
 		if !files.IsComponentFolder(targetBase) {
 			return nil, fmt.Errorf("%s: mount target must be one of: %v", errMsg, files.ComponentFolders)
+		}
+
+		if err := mnt.init(c.logger.Logger()); err != nil {
+			return nil, fmt.Errorf("%s: %w", errMsg, err)
 		}
 
 		out = append(out, mnt)

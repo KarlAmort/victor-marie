@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"github.com/gohugoio/hugo/common/collections"
+	"github.com/gohugoio/hugo/common/hreflect"
+	"github.com/gohugoio/hugo/common/hstore"
 	"github.com/gohugoio/hugo/common/maps"
 	"github.com/gohugoio/hugo/common/types"
 	"github.com/gohugoio/hugo/deps"
@@ -35,7 +37,7 @@ import (
 
 // New returns a new instance of the collections-namespaced template functions.
 func New(deps *deps.Deps) *Namespace {
-	language := deps.Conf.Language()
+	language := deps.Conf.Language().(*langs.Language)
 	if language == nil {
 		panic("language must be set")
 	}
@@ -75,7 +77,7 @@ func (ns *Namespace) After(n any, l any) (any, error) {
 	}
 
 	lv := reflect.ValueOf(l)
-	lv, isNil := indirect(lv)
+	lv, isNil := hreflect.Indirect(lv)
 	if isNil {
 		return nil, errors.New("can't iterate over a nil value")
 	}
@@ -114,7 +116,7 @@ func (ns *Namespace) Delimit(ctx context.Context, l, sep any, last ...any) (stri
 	}
 
 	lv := reflect.ValueOf(l)
-	lv, isNil := indirect(lv)
+	lv, isNil := hreflect.Indirect(lv)
 	if isNil {
 		return "", errors.New("can't iterate over a nil value")
 	}
@@ -207,7 +209,7 @@ func (ns *Namespace) First(limit any, l any) (any, error) {
 	}
 
 	lv := reflect.ValueOf(l)
-	lv, isNil := indirect(lv)
+	lv, isNil := hreflect.Indirect(lv)
 	if isNil {
 		return nil, errors.New("can't iterate over a nil value")
 	}
@@ -240,7 +242,7 @@ func (ns *Namespace) In(l any, v any) (bool, error) {
 	switch lv.Kind() {
 	case reflect.Array, reflect.Slice:
 		for i := range lv.Len() {
-			lvv, isNil := indirectInterface(lv.Index(i))
+			lvv, isNil := hreflect.Indirect(lv.Index(i))
 			if isNil {
 				continue
 			}
@@ -367,7 +369,7 @@ func (ns *Namespace) Last(limit any, l any) (any, error) {
 	}
 
 	seqv := reflect.ValueOf(l)
-	seqv, isNil := indirect(seqv)
+	seqv, isNil := hreflect.Indirect(seqv)
 	if isNil {
 		return nil, errors.New("can't iterate over a nil value")
 	}
@@ -497,7 +499,7 @@ func (ns *Namespace) Shuffle(l any) (any, error) {
 	}
 
 	lv := reflect.ValueOf(l)
-	lv, isNil := indirect(lv)
+	lv, isNil := hreflect.Indirect(lv)
 	if isNil {
 		return nil, errors.New("can't iterate over a nil value")
 	}
@@ -535,27 +537,62 @@ type dKey struct {
 	hi   int
 }
 
-// D returns a slice of n unique random numbers in the range [0, hi) using the provded seed,
-// using  J. S. Vitter's Method D for sequential random sampling, from Vitter, J.S.
-// - An Efficient Algorithm for Sequential Random Sampling - ACM Trans. Math. Software 11 (1985), 37-57.
-// See  https://getkerf.wordpress.com/2016/03/30/the-best-algorithm-no-one-knows-about/
-func (ns *Namespace) D(seed, n, hi int) []int {
-	key := dKey{seed: cast.ToUint64(seed), n: n, hi: hi}
-	if key.n <= 0 || key.hi <= 0 || key.n > key.hi {
-		return nil
+// D returns a sorted slice of unique random integers in the half-open interval
+// [0, hi) using the provided seed value. The number of elements in the
+// resulting slice is n or hi, whichever is less.
+//
+// If n <= hi, it returns a sorted random sample of size n using J. S. Vitter’s
+// Method D for sequential random sampling.
+//
+// If n > hi, it returns the full, sorted range [0, hi) of size hi.
+//
+// If n == 0 or hi == 0, it returns an empty slice.
+//
+// Reference:
+//
+//	J. S. Vitter, "An efficient algorithm for sequential random sampling," ACM Trans. Math. Softw., vol. 11, no. 1, pp. 37–57, 1985.
+//	See also: https://getkerf.wordpress.com/2016/03/30/the-best-algorithm-no-one-knows-about/
+func (ns *Namespace) D(seed, n, hi any) ([]int, error) {
+	seedInt, err := cast.ToInt64E(seed)
+	if err != nil || seedInt < 0 {
+		return nil, fmt.Errorf("the seed value (%v) must be a non-negative integer", seed)
 	}
-	if key.n > maxSeqSize {
-		panic(errSeqSizeExceedsLimit)
+
+	nInt, err := cast.ToIntE(n)
+	if err != nil || nInt < 0 || nInt > maxSeqSize {
+		return nil, fmt.Errorf("the number of requested values (%v) must be a non-negative integer <= %d", n, maxSeqSize)
 	}
-	v, _ := ns.dCache.GetOrCreate(key, func() ([]int, error) {
+
+	hiInt, err := cast.ToIntE(hi)
+	if err != nil || hiInt < 0 || hiInt > maxSeqSize {
+		return nil, fmt.Errorf("the maximum requested value (%v) must be a non-negative integer <= %d", hi, maxSeqSize)
+	}
+
+	if nInt == 0 || hiInt == 0 {
+		return []int{}, nil
+	}
+
+	key := dKey{seed: uint64(seedInt), n: nInt, hi: hiInt}
+
+	v, err := ns.dCache.GetOrCreate(key, func() ([]int, error) {
+		if key.n > key.hi {
+			result := make([]int, key.hi)
+			for i := 0; i < key.hi; i++ {
+				result[i] = i
+			}
+			return result, nil
+		}
+
 		prng := rand.New(rand.NewPCG(key.seed, 0))
 		result := make([]int, 0, key.n)
 		_d(prng, key.n, key.hi, func(i int) {
 			result = append(result, i)
 		})
+
 		return result, nil
 	})
-	return v
+
+	return v, err
 }
 
 type intersector struct {
@@ -574,13 +611,13 @@ func (i *intersector) appendIfNotSeen(v reflect.Value) {
 func (i *intersector) handleValuePair(l1vv, l2vv reflect.Value) {
 	switch kind := l1vv.Kind(); {
 	case kind == reflect.String:
-		l2t, err := toString(l2vv)
+		l2t, err := hreflect.ToStringE(l2vv)
 		if err == nil && l1vv.String() == l2t {
 			i.appendIfNotSeen(l1vv)
 		}
-	case isNumber(kind):
-		f1, err1 := numberToFloat(l1vv)
-		f2, err2 := numberToFloat(l2vv)
+	case hreflect.IsNumber(kind):
+		f1, err1 := hreflect.ToFloat64E(l1vv)
+		f2, err2 := hreflect.ToFloat64E(l2vv)
 		if err1 == nil && err2 == nil && f1 == f2 {
 			i.appendIfNotSeen(l1vv)
 		}
@@ -629,7 +666,7 @@ func (ns *Namespace) Union(l1, l2 any) (any, error) {
 			)
 
 			for i := range l1v.Len() {
-				l1vv, isNil = indirectInterface(l1v.Index(i))
+				l1vv, isNil = hreflect.Indirect(l1v.Index(i))
 
 				if !l1vv.Type().Comparable() {
 					return []any{}, errors.New("union does not support slices or arrays of uncomparable types")
@@ -650,16 +687,17 @@ func (ns *Namespace) Union(l1, l2 any) (any, error) {
 
 			for j := range l2v.Len() {
 				l2vv := l2v.Index(j)
+				typ := l1vv.Type()
 
 				switch kind := l1vv.Kind(); {
 				case kind == reflect.String:
-					l2t, err := toString(l2vv)
+					l2t, err := hreflect.ToStringE(l2vv)
 					if err == nil {
 						ins.appendIfNotSeen(reflect.ValueOf(l2t))
 					}
-				case isNumber(kind):
+				case hreflect.IsNumber(kind):
 					var err error
-					l2vv, err = convertNumber(l2vv, kind)
+					l2vv, err = convertNumber(l2vv, typ)
 					if err == nil {
 						ins.appendIfNotSeen(l2vv)
 					}
@@ -700,7 +738,7 @@ func (ns *Namespace) Uniq(l any) (any, error) {
 	seen := make(map[any]bool)
 
 	for i := range v.Len() {
-		ev, _ := indirectInterface(v.Index(i))
+		ev, _ := hreflect.Indirect(v.Index(i))
 
 		key := normalize(ev)
 
@@ -720,6 +758,6 @@ func (ns *Namespace) KeyVals(key any, values ...any) (types.KeyValues, error) {
 
 // NewScratch creates a new Scratch which can be used to store values in a
 // thread safe way.
-func (ns *Namespace) NewScratch() *maps.Scratch {
-	return maps.NewScratch()
+func (ns *Namespace) NewScratch() *hstore.Scratch {
+	return hstore.NewScratch()
 }

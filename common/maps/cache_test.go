@@ -1,4 +1,4 @@
-// Copyright 2024 The Hugo Authors. All rights reserved.
+// Copyright 2025 The Hugo Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ func TestCacheSize(t *testing.T) {
 
 	cache := NewCacheWithOptions[string, string](CacheOptions{Size: 10})
 
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		cache.Set(string(rune('a'+i)), "value")
 	}
 

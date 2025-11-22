@@ -30,8 +30,9 @@ import (
 	"github.com/bep/godartsass/v2"
 
 	"github.com/gohugoio/hugo/common/hexec"
+	"github.com/gohugoio/hugo/common/hstore"
 	"github.com/gohugoio/hugo/common/loggers"
-	"github.com/gohugoio/hugo/common/maps"
+	"github.com/gohugoio/hugo/common/version"
 	"github.com/gohugoio/hugo/hugofs/files"
 
 	"github.com/bep/helpers/contexthelpers"
@@ -55,7 +56,7 @@ var (
 	vendorInfo string
 )
 
-var _ maps.StoreProvider = (*HugoInfo)(nil)
+var _ hstore.StoreProvider = (*HugoInfo)(nil)
 
 // HugoInfo contains information about the current Hugo environment
 type HugoInfo struct {
@@ -74,14 +75,14 @@ type HugoInfo struct {
 	conf ConfigProvider
 	deps []*Dependency
 
-	store *maps.Scratch
+	store *hstore.Scratch
 
 	// Context gives access to some of the context scoped variables.
 	Context Context
 }
 
 // Version returns the current version as a comparable version string.
-func (i HugoInfo) Version() VersionString {
+func (i HugoInfo) Version() version.VersionString {
 	return CurrentVersion.Version()
 }
 
@@ -120,7 +121,7 @@ func (i HugoInfo) Deps() []*Dependency {
 	return i.deps
 }
 
-func (i HugoInfo) Store() *maps.Scratch {
+func (i HugoInfo) Store() *hstore.Scratch {
 	return i.store
 }
 
@@ -197,7 +198,7 @@ func NewInfo(conf ConfigProvider, deps []*Dependency) HugoInfo {
 		Environment: conf.Environment(),
 		conf:        conf,
 		deps:        deps,
-		store:       maps.NewScratch(),
+		store:       hstore.NewScratch(),
 		GoVersion:   goVersion,
 	}
 }
@@ -452,7 +453,7 @@ func deprecateLevelWithLogger(item, alternative, version string, level logg.Leve
 // We want people to run at least the current and previous version without any warnings.
 // We want people who don't update Hugo that often to see the warnings and errors before we remove the feature.
 func deprecationLogLevelFromVersion(ver string) logg.Level {
-	from := MustParseVersion(ver)
+	from := version.MustParseVersion(ver)
 	to := CurrentVersion
 	minorDiff := to.Minor - from.Minor
 	switch {
@@ -465,4 +466,47 @@ func deprecationLogLevelFromVersion(ver string) logg.Level {
 	default:
 		return logg.LevelInfo
 	}
+}
+
+// BuildVersionString creates a version string. This is what you see when
+// running "hugo version".
+func BuildVersionString() string {
+	// program := "Hugo Static Site Generator"
+	program := "hugo"
+
+	version := "v" + CurrentVersion.String()
+
+	bi := getBuildInfo()
+	if bi == nil {
+		return version
+	}
+	if bi.Revision != "" {
+		version += "-" + bi.Revision
+	}
+	if IsExtended {
+		version += "+extended"
+	}
+	if IsWithdeploy {
+		version += "+withdeploy"
+	}
+
+	osArch := bi.GoOS + "/" + bi.GoArch
+
+	date := bi.RevisionTime
+	if date == "" {
+		// Accept vendor-specified build date if .git/ is unavailable.
+		date = buildDate
+	}
+	if date == "" {
+		date = "unknown"
+	}
+
+	versionString := fmt.Sprintf("%s %s %s BuildDate=%s",
+		program, version, osArch, date)
+
+	if vendorInfo != "" {
+		versionString += " VendorInfo=" + vendorInfo
+	}
+
+	return versionString
 }
