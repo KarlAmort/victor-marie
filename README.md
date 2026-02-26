@@ -23,6 +23,12 @@
 [website]: https://gohugo.io
 [windows]: https://gohugo.io/installation/windows
 
+> **victor-marie** is the non-fascist, reasonable, reality-based fork of Hugo.
+> Twitter is called Twitter. The `twitter`, `tweet`, and `twitter_simple` shortcodes work without deprecation warnings or errors.
+> Named after [Victor Marie Hugo](https://en.wikipedia.org/wiki/Victor_Hugo), who would not have renamed his pen.
+
+---
+
 <a href="https://gohugo.io/"><img src="https://raw.githubusercontent.com/gohugoio/gohugoioTheme/master/static/images/hugo-logo-wide.svg?sanitize=true" alt="Hugo" width="565"></a>
 
 A fast and flexible static site generator built with love by [bep], [spf13], and [friends] in [Go].

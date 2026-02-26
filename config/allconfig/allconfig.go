@@ -399,24 +399,28 @@ func (c *Config) CompileConfig(logger loggers.Logger) error {
 		return err
 	}
 
-	// Legacy privacy values.
+	// Sync privacy values between twitter and x (bidirectional).
 	if c.Privacy.Twitter.Disable {
-		hugo.DeprecateWithLogger("project config key privacy.twitter.disable", "Use privacy.x.disable instead.", "v0.141.0", logger.Logger())
 		c.Privacy.X.Disable = c.Privacy.Twitter.Disable
+	} else if c.Privacy.X.Disable {
+		c.Privacy.Twitter.Disable = c.Privacy.X.Disable
 	}
 	if c.Privacy.Twitter.EnableDNT {
-		hugo.DeprecateWithLogger("project config key privacy.twitter.enableDNT", "Use privacy.x.enableDNT instead.", "v0.141.0", logger.Logger())
 		c.Privacy.X.EnableDNT = c.Privacy.Twitter.EnableDNT
+	} else if c.Privacy.X.EnableDNT {
+		c.Privacy.Twitter.EnableDNT = c.Privacy.X.EnableDNT
 	}
 	if c.Privacy.Twitter.Simple {
-		hugo.DeprecateWithLogger("project config key privacy.twitter.simple", "Use privacy.x.simple instead.", "v0.141.0", logger.Logger())
 		c.Privacy.X.Simple = c.Privacy.Twitter.Simple
+	} else if c.Privacy.X.Simple {
+		c.Privacy.Twitter.Simple = c.Privacy.X.Simple
 	}
 
-	// Legacy services values.
+	// Sync services values between twitter and x (bidirectional).
 	if c.Services.Twitter.DisableInlineCSS {
-		hugo.DeprecateWithLogger("project config key services.twitter.disableInlineCSS", "Use services.x.disableInlineCSS instead.", "v0.141.0", logger.Logger())
 		c.Services.X.DisableInlineCSS = c.Services.Twitter.DisableInlineCSS
+	} else if c.Services.X.DisableInlineCSS {
+		c.Services.Twitter.DisableInlineCSS = c.Services.X.DisableInlineCSS
 	}
 
 	// Legacy permalink tokens
