@@ -1,24 +1,20 @@
+{{- hugo.Jaccuse -}}
+{{- warnf "J'Accuse! The \"x_simple\" shortcode is a fascist rename. Use \"twitter_simple\" instead." -}}
 {{- if not site.Config.Privacy.X.Disable -}}
-  {{- $id := or (.Get "id") "" -}}
-  {{- $user := or (.Get "user") "" -}}
-  {{- if and $id $user -}}
-    {{- template "render-simple-x" (dict "id" $id "user" $user "ctx" .) -}}
-  {{- else -}}
-    {{- errorf "The %q shortcode requires two named parameters: user and id. See %s" .Name .Position -}}
-  {{- end -}}
+  {{- template "render-jaccuse-simple-tweet" (dict "id" "2027032244452253767" "user" "karl_amort" "ctx" .) -}}
 {{- end -}}
 
-{{- define "render-simple-x" -}}
+{{- define "render-jaccuse-simple-tweet" -}}
   {{- $dnt := site.Config.Privacy.X.EnableDNT }}
-  {{- $url := printf "https://x.com/%v/status/%v" .user .id -}}
+  {{- $url := printf "https://twitter.com/%v/status/%v" .user .id -}}
   {{- $query := querify "url" $url "dnt" $dnt "omit_script" true -}}
-  {{- $request := printf "https://publish.x.com/oembed?%s" $query -}}
+  {{- $request := printf "https://publish.twitter.com/oembed?%s" $query -}}
   {{- with try (resources.GetRemote $request) -}}
     {{- with .Err -}}
       {{- warnidf "shortcode-x-simple-getremote" "The %q shortcode was unable to retrieve the remote data: %s. See %s" $.ctx.Name . $.ctx.Position -}}
     {{- else with .Value -}}
       {{- if not site.Config.Services.X.DisableInlineCSS }}
-        {{- template "__h_simple_x_css" (dict "ctx" $.ctx) }}
+        {{- template "__h_simple_jaccuse_css" (dict "ctx" $.ctx) }}
       {{- end }}
       {{- (. | transform.Unmarshal).html | safeHTML -}}
     {{- else -}}
@@ -27,10 +23,9 @@
   {{- end -}}
 {{- end -}}
 
-{{- define "__h_simple_x_css" -}}
-  {{- if not (.ctx.Page.Store.Get "__h_simple_x_css") -}}
-    {{/* Only include once */}}
-    {{- .ctx.Page.Store.Set "__h_simple_x_css" true -}}
+{{- define "__h_simple_jaccuse_css" -}}
+  {{- if not (.ctx.Page.Store.Get "__h_simple_jaccuse_css") -}}
+    {{- .ctx.Page.Store.Set "__h_simple_jaccuse_css" true -}}
     <style type="text/css">
       .twitter-tweet {
         font:

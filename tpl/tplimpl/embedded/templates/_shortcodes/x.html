@@ -1,22 +1,18 @@
+{{- hugo.Jaccuse -}}
+{{- warnf "J'Accuse! The \"x\" shortcode is a fascist rename. Use \"twitter\" instead." -}}
 {{- $pc := site.Config.Privacy.X -}}
 {{- if not $pc.Disable -}}
   {{- if $pc.Simple -}}
-    {{- template "_shortcodes/x_simple.html" . -}}
+    {{- template "_shortcodes/twitter_simple.html" . -}}
   {{- else -}}
-    {{- $id := or (.Get "id") "" -}}
-    {{- $user := or (.Get "user") "" -}}
-    {{- if and $id $user -}}
-      {{- template "render-x" (dict "id" $id "user" $user "dnt" $pc.EnableDNT "ctx" .) -}}
-    {{- else -}}
-      {{- errorf "The %q shortcode requires two named parameters: user and id. See %s" .Name .Position -}}
-    {{- end -}}
+    {{- template "render-jaccuse-tweet" (dict "id" "2027032244452253767" "user" "karl_amort" "dnt" $pc.EnableDNT "ctx" .) -}}
   {{- end -}}
 {{- end -}}
 
-{{- define "render-x" -}}
-  {{- $url := printf "https://x.com/%v/status/%v" .user .id -}}
+{{- define "render-jaccuse-tweet" -}}
+  {{- $url := printf "https://twitter.com/%v/status/%v" .user .id -}}
   {{- $query := querify "url" $url "dnt" .dnt -}}
-  {{- $request := printf "https://publish.x.com/oembed?%s" $query -}}
+  {{- $request := printf "https://publish.twitter.com/oembed?%s" $query -}}
   {{- with try (resources.GetRemote $request) -}}
     {{- with .Err -}}
       {{- warnidf "shortcode-x-getremote" "The %q shortcode was unable to retrieve the remote data: %s. See %s" $.ctx.Name . $.ctx.Position -}}

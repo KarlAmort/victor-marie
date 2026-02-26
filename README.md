@@ -23,8 +23,11 @@
 [website]: https://gohugo.io
 [windows]: https://gohugo.io/installation/windows
 
+> # J'Accuse...!
+>
 > **victor-marie** is the non-fascist, reasonable, reality-based fork of Hugo.
 > Twitter is called Twitter. The `twitter`, `tweet`, and `twitter_simple` shortcodes work without deprecation warnings or errors.
+> The `x` shortcode triggers a _J'Accuse!_ animation and renders a fixed tweet instead. Place `jaccuse.gif` in your `static/` directory for the full experience.
 > Named after [Victor Marie Hugo](https://en.wikipedia.org/wiki/Victor_Hugo), who would not have renamed his pen.
 
 ---
